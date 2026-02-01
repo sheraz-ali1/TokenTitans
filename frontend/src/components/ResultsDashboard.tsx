@@ -210,12 +210,22 @@ export default function ResultsDashboard({
                   Confirmed Issues
                 </p>
                 <ul className="space-y-1">
-                  {assessment.confirmed_discrepancies.map((item, i) => (
-                    <li key={i} className="text-sm text-red-300 flex items-start gap-2">
-                      <span className="text-red-500 mt-0.5">&#x2717;</span>
-                      {typeof item === "string" ? item : JSON.stringify(item)}
-                    </li>
-                  ))}
+                  {assessment.confirmed_discrepancies.map((item, i) => {
+                    let displayText = "";
+                    if (typeof item === "string") {
+                      displayText = item;
+                    } else if (item && typeof item === "object" && "description" in item) {
+                      displayText = item.description;
+                    } else {
+                      displayText = JSON.stringify(item);
+                    }
+                    return (
+                      <li key={i} className="text-sm text-red-300 flex items-start gap-2">
+                        <span className="text-red-500 mt-0.5">&#x2717;</span>
+                        {displayText}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -225,12 +235,22 @@ export default function ResultsDashboard({
                   New Concerns
                 </p>
                 <ul className="space-y-1">
-                  {assessment.new_concerns.map((item, i) => (
-                    <li key={i} className="text-sm text-amber-300 flex items-start gap-2">
-                      <span className="text-amber-500 mt-0.5">!</span>
-                      {typeof item === "string" ? item : JSON.stringify(item)}
-                    </li>
-                  ))}
+                  {assessment.new_concerns.map((item, i) => {
+                    let displayText = "";
+                    if (typeof item === "string") {
+                      displayText = item;
+                    } else if (item && typeof item === "object" && "description" in item) {
+                      displayText = item.description;
+                    } else {
+                      displayText = JSON.stringify(item);
+                    }
+                    return (
+                      <li key={i} className="text-sm text-amber-300 flex items-start gap-2">
+                        <span className="text-amber-500 mt-0.5">!</span>
+                        {displayText}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -240,12 +260,22 @@ export default function ResultsDashboard({
                   Cleared Items
                 </p>
                 <ul className="space-y-1">
-                  {assessment.cleared_items.map((item, i) => (
-                    <li key={i} className="text-sm text-teal-300 flex items-start gap-2">
-                      <span className="text-teal-500 mt-0.5">&#x2713;</span>
-                      {typeof item === "string" ? item : JSON.stringify(item)}
-                    </li>
-                  ))}
+                  {assessment.cleared_items.map((item, i) => {
+                    let displayText = "";
+                    if (typeof item === "string") {
+                      displayText = item;
+                    } else if (item && typeof item === "object" && "description" in item) {
+                      displayText = item.description;
+                    } else {
+                      displayText = JSON.stringify(item);
+                    }
+                    return (
+                      <li key={i} className="text-sm text-teal-300 flex items-start gap-2">
+                        <span className="text-teal-500 mt-0.5">&#x2713;</span>
+                        {displayText}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
