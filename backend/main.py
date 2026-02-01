@@ -1,10 +1,13 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from extraction import extract_bill_data
 from discrepancy import detect_discrepancies
 from conversation import get_chat_response
 from database import get_fee_info
+from hospital_lookup import lookup_hospital
+from dispute_generator import generate_dispute_letter
+from email_sender import send_dispute_email
 
 app = FastAPI(title="MedBill Analyzer")
 
@@ -29,6 +32,21 @@ ALLOWED_MIME_TYPES = {
 class ChatMessage(BaseModel):
     session_id: str
     message: str
+
+
+class ConfirmBillRequest(BaseModel):
+    session_id: str
+    bill_data: dict  # The edited bill data from frontend
+
+
+class DisputePreviewRequest(BaseModel):
+    session_id: str
+
+
+class DisputeSendRequest(BaseModel):
+    session_id: str
+    recipient_email: EmailStr
+    letter: str
 
 
 @app.get("/health")
@@ -110,17 +128,42 @@ async def upload_bill(file: UploadFile = File(...)):
     # Enrich line items with reference prices
     enrich_line_items_with_reference_prices(bill_data)
 
-    discrepancies = detect_discrepancies(bill_data)
-
+    # Do NOT run discrepancy detection yet - wait for user to confirm/edit
     session_counter += 1
     session_id = f"session-{session_counter}"
     bill_store[session_id] = {
         "bill_data": bill_data,
-        "discrepancies": discrepancies,
+        "discrepancies": [],  # Empty until user confirms
         "chat_history": [],
     }
 
-    return {"session_id": session_id, "bill_data": bill_data, "discrepancies": discrepancies}
+    return {"session_id": session_id, "bill_data": bill_data}
+
+
+@app.post("/confirm-bill")
+async def confirm_bill(req: ConfirmBillRequest):
+    """Run discrepancy detection after user confirms/edits the bill."""
+    if req.session_id not in bill_store:
+        raise HTTPException(404, "Session not found")
+
+    session = bill_store[req.session_id]
+    
+    # Save the (potentially edited) bill data
+    session["bill_data"] = req.bill_data
+    
+    # Re-enrich with reference prices in case items were edited
+    enrich_line_items_with_reference_prices(req.bill_data)
+    
+    # Now run discrepancy detection on the confirmed data
+    discrepancies = detect_discrepancies(req.bill_data)
+    session["discrepancies"] = discrepancies
+    
+    total_savings = sum((d.get("potential_overcharge") or 0) for d in discrepancies)
+    
+    return {
+        "discrepancies": discrepancies,
+        "total_savings": total_savings
+    }
 
 
 @app.post("/chat")
@@ -187,3 +230,57 @@ async def get_results(session_id: str):
         "total_potential_savings": total_potential_savings,
         "chat_history": session["chat_history"],
     }
+
+
+@app.post("/dispute/preview")
+async def dispute_preview(req: DisputePreviewRequest):
+    if req.session_id not in bill_store:
+        raise HTTPException(404, "Session not found")
+
+    session = bill_store[req.session_id]
+    bill_data = session["bill_data"]
+    discrepancies = session["discrepancies"]
+    assessment = session.get("final_assessment")
+
+    # 1. Look up hospital info
+    hospital_info = lookup_hospital(bill_data.get("provider_name"))
+
+    # 2. Generate letter
+    draft_letter = generate_dispute_letter(bill_data, discrepancies, assessment)
+
+    # 3. Calculate savings
+    total_savings = sum(d.get("potential_overcharge", 0) for d in discrepancies)
+
+    # 4. Summary of issues
+    issues = [
+        {
+            "type": d["type"],
+            "description": d["description"],
+            "potential_overcharge": d.get("potential_overcharge", 0)
+        }
+        for d in discrepancies
+    ]
+
+    return {
+        "hospital_name": hospital_info.get("hospital_name"),
+        "hospital_address": hospital_info.get("address"),
+        "hospital_email": hospital_info.get("billing_email"),
+        "draft_letter": draft_letter,
+        "issues": issues,
+        "total_savings": total_savings
+    }
+
+
+@app.post("/dispute/send")
+async def dispute_send(req: DisputeSendRequest):
+    if req.session_id not in bill_store:
+        raise HTTPException(404, "Session not found")
+    
+    session = bill_store[req.session_id]
+    account_number = session["bill_data"].get("account_number", "Unknown")
+
+    try:
+        send_dispute_email(req.recipient_email, req.letter, account_number)
+        return {"status": "sent"}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to send email: {str(e)}")

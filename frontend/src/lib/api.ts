@@ -41,8 +41,12 @@ export interface Discrepancy {
 export interface UploadResponse {
   session_id: string;
   bill_data: BillData;
+  // Note: discrepancies are empty until user confirms bill
+}
+
+export interface ConfirmBillResponse {
   discrepancies: Discrepancy[];
-  image_url?: string; // Optional blob URL for the uploaded image
+  total_savings: number;
 }
 
 export interface ChatResponse {
@@ -61,6 +65,15 @@ export interface ResultsResponse {
   assessment: ChatResponse["assessment"];
   total_potential_savings: number;
   chat_history: { role: string; content: string }[];
+}
+
+export interface DisputePreviewResponse {
+  hospital_name: string;
+  hospital_address: string;
+  hospital_email: string;
+  draft_letter: string;
+  issues: { type: string; description: string; potential_overcharge: number }[];
+  total_savings: number;
 }
 
 export async function uploadBill(file: File): Promise<UploadResponse> {
@@ -90,6 +103,19 @@ export async function uploadBill(file: File): Promise<UploadResponse> {
   return data;
 }
 
+export async function confirmBill(sessionId: string, billData: BillData): Promise<ConfirmBillResponse> {
+  const res = await fetch(`${API_BASE}/confirm-bill`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, bill_data: billData }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || res.statusText);
+  }
+  return res.json();
+}
+
 export async function startChat(sessionId: string): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE}/chat/start`, {
     method: "POST",
@@ -113,5 +139,25 @@ export async function sendMessage(sessionId: string, message: string): Promise<C
 export async function getResults(sessionId: string): Promise<ResultsResponse> {
   const res = await fetch(`${API_BASE}/results/${sessionId}`);
   if (!res.ok) throw new Error(`Results failed: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getDisputePreview(sessionId: string): Promise<DisputePreviewResponse> {
+  const res = await fetch(`${API_BASE}/dispute/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  if (!res.ok) throw new Error(`Dispute preview failed: ${res.statusText}`);
+  return res.json();
+}
+
+export async function sendDispute(sessionId: string, recipientEmail: string, letter: string): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/dispute/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, recipient_email: recipientEmail, letter }),
+  });
+  if (!res.ok) throw new Error(`Dispute send failed: ${res.statusText}`);
   return res.json();
 }
