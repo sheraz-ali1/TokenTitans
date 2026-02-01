@@ -20,11 +20,17 @@ export default function BillUpload({ onUploadComplete }: BillUploadProps) {
       setIsUploading(true);
 
       try {
+        // Create a blob URL only for image files (not PDFs)
+        const isImage = file.type.startsWith('image/');
+        const imageUrl = isImage ? URL.createObjectURL(file) : undefined;
+        
         const data = await uploadBill(file);
         if (!data || !data.bill_data) {
           throw new Error("Invalid response from server");
         }
-        onUploadComplete(data);
+        
+        // Add the image URL to the response
+        onUploadComplete({ ...data, image_url: imageUrl });
       } catch (err) {
         console.error("Upload error:", err);
         setError(err instanceof Error ? err.message : "Upload failed");

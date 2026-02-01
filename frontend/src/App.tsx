@@ -21,12 +21,14 @@ function App() {
   const [assessment, setAssessment] = useState<ChatResponse["assessment"]>(null);
   const [totalSavings, setTotalSavings] = useState(0);
   const [chatKey, setChatKey] = useState(0);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const handleUploadComplete = useCallback((data: UploadResponse) => {
     try {
       setSessionId(data.session_id);
       setBillData(data.bill_data);
       setDiscrepancies(data.discrepancies || []);
+      setImageUrl(data.image_url || null);
       setScreen("review");
     } catch (error) {
       console.error("Error handling upload complete:", error);
@@ -55,13 +57,18 @@ function App() {
   );
 
   const handleRestart = useCallback(() => {
+    // Clean up blob URL if it exists
+    if (imageUrl) {
+      URL.revokeObjectURL(imageUrl);
+    }
     setScreen("upload");
     setSessionId("");
     setBillData(null);
     setDiscrepancies([]);
     setAssessment(null);
     setTotalSavings(0);
-  }, []);
+    setImageUrl(null);
+  }, [imageUrl]);
 
   if (screen === "upload") {
     return <BillUpload onUploadComplete={handleUploadComplete} />;
@@ -98,9 +105,9 @@ function App() {
           }}
         />
 
-        <div className="relative z-10 max-w-4xl mx-auto px-6 py-12">
+        <div className="relative z-10 max-w-6xl mx-auto px-4 py-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight">
                 Bill Extracted
@@ -119,8 +126,8 @@ function App() {
           </div>
 
           {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
               <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
                 Total Billed
               </p>
@@ -131,7 +138,7 @@ function App() {
                 })}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
               <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
                 Issues Found
               </p>
@@ -143,7 +150,7 @@ function App() {
                 {discrepancies.length}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
               <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
                 Potential Savings
               </p>
@@ -158,11 +165,11 @@ function App() {
 
           {/* Discrepancy alerts */}
           {discrepancies.length > 0 && (
-            <div className="mb-6 space-y-2">
+            <div className="mb-4 space-y-2">
               {discrepancies.map((d, i) => (
                 <div
                   key={i}
-                  className={`rounded-lg px-4 py-3 text-sm flex items-center justify-between ${
+                  className={`rounded-lg px-3 py-2 text-sm flex items-center justify-between ${
                     d.severity === "high"
                       ? "bg-red-500/10 border border-red-500/20 text-red-300"
                       : d.severity === "medium"
@@ -181,15 +188,37 @@ function App() {
             </div>
           )}
 
-          {/* Line items */}
+          {/* Side-by-side: Image and Table */}
           {billData.line_items && billData.line_items.length > 0 && (
-            <div className="mb-8">
-              <BillItemsTable items={billData.line_items} discrepancies={discrepancies} />
+            <div className={`grid gap-4 mb-6 ${imageUrl ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+              {/* Uploaded Image */}
+              {imageUrl && (
+                <div className="rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
+                  <div className="p-3 border-b border-slate-800">
+                    <h2 className="text-white text-sm font-semibold">Uploaded Bill</h2>
+                  </div>
+                  <div className="p-3">
+                    <img
+                      src={imageUrl}
+                      alt="Uploaded medical bill"
+                      className="w-full h-auto rounded-lg border border-slate-800 max-h-[600px] object-contain bg-slate-950"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* Line items table */}
+              <div className={`${!imageUrl ? 'lg:col-span-1' : ''}`}>
+                <div className="mb-2">
+                  <h2 className="text-white text-sm font-semibold">Extracted Charges</h2>
+                </div>
+                <BillItemsTable items={billData.line_items} discrepancies={discrepancies} />
+              </div>
             </div>
           )}
 
           {/* Continue to chat */}
-          <div className="flex justify-center">
+          <div className="flex justify-center mt-6">
             <button
               onClick={() => {
                 setChatKey(prev => prev + 1);

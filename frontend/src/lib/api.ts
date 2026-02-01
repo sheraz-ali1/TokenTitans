@@ -8,6 +8,9 @@ export interface LineItem {
   total_charge: number;
   date_of_service: string | null;
   category: string;
+  expected_charge?: number | null;
+  expected_charge_per_unit?: number | null;
+  high_price_per_unit?: number | null;
 }
 
 export interface BillData {
@@ -39,6 +42,7 @@ export interface UploadResponse {
   session_id: string;
   bill_data: BillData;
   discrepancies: Discrepancy[];
+  image_url?: string; // Optional blob URL for the uploaded image
 }
 
 export interface ChatResponse {
