@@ -1,0 +1,22 @@
+{
+  "99213": {"description": "Office visit, established patient (low complexity)", "avg_price": 150, "high_price": 300},
+  "99214": {"description": "Office visit, established patient (moderate complexity)", "avg_price": 250, "high_price": 450},
+  "99283": {"description": "Emergency dept visit (moderate severity)", "avg_price": 600, "high_price": 1200},
+  "99284": {"description": "Emergency dept visit (high severity)", "avg_price": 1100, "high_price": 2200},
+  "99285": {"description": "Emergency dept visit (critical severity)", "avg_price": 1800, "high_price": 3500},
+  "36415": {"description": "Venipuncture (blood draw)", "avg_price": 15, "high_price": 50},
+  "85025": {"description": "Complete blood count (CBC)", "avg_price": 30, "high_price": 80},
+  "80053": {"description": "Comprehensive metabolic panel", "avg_price": 35, "high_price": 100},
+  "71046": {"description": "Chest X-ray, 2 views", "avg_price": 75, "high_price": 250},
+  "93000": {"description": "Electrocardiogram (ECG/EKG)", "avg_price": 50, "high_price": 200},
+  "80061": {"description": "Lipid panel", "avg_price": 40, "high_price": 120},
+  "81001": {"description": "Urinalysis", "avg_price": 15, "high_price": 60},
+  "97110": {"description": "Therapeutic exercises", "avg_price": 75, "high_price": 200},
+  "29125": {"description": "Forearm splint", "avg_price": 100, "high_price": 300},
+  "99221": {"description": "Initial hospital care (low complexity)", "avg_price": 200, "high_price": 450},
+  "99222": {"description": "Initial hospital care (moderate complexity)", "avg_price": 300, "high_price": 600},
+  "99223": {"description": "Initial hospital care (high complexity)", "avg_price": 400, "high_price": 800},
+  "99231": {"description": "Subsequent hospital care (low complexity)", "avg_price": 100, "high_price": 250},
+  "99232": {"description": "Subsequent hospital care (moderate complexity)", "avg_price": 150, "high_price": 350},
+  "99233": {"description": "Subsequent hospital care (high complexity)", "avg_price": 200, "high_price": 450}
+}
