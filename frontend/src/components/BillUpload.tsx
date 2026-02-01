@@ -2,6 +2,8 @@ import { useState, useCallback, useRef } from "react";
 import type { UploadResponse } from "@/lib/api";
 import { uploadBill } from "@/lib/api";
 
+const API_BASE = "http://localhost:8000";
+
 interface BillUploadProps {
   onUploadComplete: (data: UploadResponse) => void;
   onImageReady?: (imageUrl: string) => void;
@@ -69,6 +71,47 @@ export default function BillUpload({ onUploadComplete, onImageReady }: BillUploa
   const handleDragLeave = useCallback(() => {
     setIsDragging(false);
   }, []);
+
+  const handleTestImage = useCallback(async () => {
+    setError(null);
+    setIsUploading(true);
+    
+    try {
+      // Fetch random test image from backend
+      const response = await fetch(`${API_BASE}/test-image`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch test image");
+      }
+      
+      const blob = await response.blob();
+      const fileName = response.headers.get("content-disposition")?.split("filename=")[1]?.replace(/"/g, "") || "test-bill.png";
+      const file = new File([blob], fileName, { type: blob.type });
+      
+      // Create blob URL immediately for image files
+      const isImage = file.type.startsWith('image/');
+      const imageUrl = isImage ? URL.createObjectURL(file) : undefined;
+      
+      if (imageUrl && onImageReady) {
+        onImageReady(imageUrl);
+      }
+      
+      setFileName(file.name);
+      
+      // Upload the file
+      const data = await uploadBill(file);
+      if (!data || !data.bill_data) {
+        throw new Error("Invalid response from server");
+      }
+      
+      // Add the image URL to the response
+      onUploadComplete({ ...data, image_url: imageUrl });
+    } catch (err) {
+      console.error("Test image error:", err);
+      setError(err instanceof Error ? err.message : "Failed to load test image");
+      setIsUploading(false);
+      setFileName(null);
+    }
+  }, [onUploadComplete, onImageReady]);
 
   return (
     <div className="min-h-screen bg-[#0a0f1c] flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -202,6 +245,35 @@ export default function BillUpload({ onUploadComplete, onImageReady }: BillUploa
             <p className="text-red-400 text-xs font-mono">{error}</p>
           </div>
         )}
+      </div>
+
+      {/* Test with sample image button */}
+      <div className="relative z-10 mt-6 text-center">
+        <button
+          onClick={handleTestImage}
+          disabled={isUploading}
+          className={`
+            px-6 py-2.5 rounded-xl text-sm font-medium transition-all
+            ${isUploading
+              ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+              : "bg-slate-800/50 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700 hover:border-slate-600"
+            }
+          `}
+        >
+          {isUploading ? (
+            <span className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full border-2 border-slate-500 border-t-transparent animate-spin" />
+              Loading test image...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.57.393A9.065 9.065 0 0121 18.5a9.065 9.065 0 01-6.23-.693L14.25 3.104M5 14.5l-1.57.393A9.065 9.065 0 003 18.5a9.065 9.065 0 006.23-.693L5 14.5" />
+              </svg>
+              Test with Sample Image
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Footer info */}
