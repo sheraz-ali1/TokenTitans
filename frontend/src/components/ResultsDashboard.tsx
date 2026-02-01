@@ -80,21 +80,17 @@ export default function ResultsDashboard({
           </button>
         </div>
 
-        {/* Savings hero */}
+        {/* Summary stats */}
         <div
           className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900/80 to-slate-900/40 p-8 mb-8 animate-[fadeIn_0.6s_ease-out_0.1s_both]"
         >
           <div className="flex items-start justify-between">
             <div>
               <p className="text-slate-500 text-xs tracking-wider uppercase font-medium mb-2">
-                Potential Savings Identified
+                Issues Found
               </p>
               <p className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-teal-500 font-mono tracking-tight">
-                $
-                {totalSavings.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {discrepancies.length}
               </p>
               <div className="flex items-center gap-4 mt-4">
                 {highCount > 0 && (

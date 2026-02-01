@@ -95,17 +95,9 @@ export default function DisputePage({
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Dispute Sent!</h2>
-            <p className="text-slate-400 text-sm mb-4">
+            <p className="text-slate-400 text-sm mb-6">
               Your formal dispute letter has been emailed to {recipientEmail}.
             </p>
-            <Card className="bg-teal-500/10 border-teal-500/20 mb-6">
-              <CardContent className="py-4">
-                <p className="text-xs text-teal-300 uppercase tracking-wider mb-1">Potential Savings</p>
-                <p className="text-3xl font-bold text-teal-400 font-mono">
-                  ${totalSavings.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </p>
-              </CardContent>
-            </Card>
             <div className="flex gap-4 justify-center">
               <Button
                 onClick={onRestart}
@@ -228,7 +220,7 @@ export default function DisputePage({
           <div className="space-y-6 animate-[fadeIn_0.4s_ease-out]">
             
             {/* Stats Cards */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <Card className="bg-slate-900/50 border-slate-800">
                 <CardContent className="py-5">
                   <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Total Billed</p>
@@ -241,14 +233,6 @@ export default function DisputePage({
                 <CardContent className="py-5">
                   <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Issues Identified</p>
                   <p className="text-white text-xl font-mono font-bold">{discrepancies.length}</p>
-                </CardContent>
-              </Card>
-              <Card className="border-teal-500/30 bg-teal-500/5">
-                <CardContent className="py-5">
-                  <p className="text-teal-300 text-xs uppercase tracking-wider mb-1">Potential Savings</p>
-                  <p className="text-teal-400 text-xl font-mono font-bold">
-                    ${totalSavings.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </p>
                 </CardContent>
               </Card>
             </div>
