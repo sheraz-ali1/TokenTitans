@@ -29,7 +29,7 @@ def _check_duplicates(items: list[dict]) -> list[dict]:
                 "confidence": "high",
                 "description": f"Duplicate charge detected: '{item['description']}' appears multiple times on {item.get('date_of_service', 'same date')}",
                 "items_involved": [seen[key], i],
-                "potential_overcharge": item.get("total_charge", 0),
+                "potential_overcharge": item.get("total_charge") or 0,
             })
         else:
             seen[key] = i
@@ -83,7 +83,7 @@ def _check_quantity_anomalies(items: list[dict]) -> list[dict]:
     """Flag unusually high quantities."""
     flags = []
     for i, item in enumerate(items):
-        qty = item.get("quantity", 1)
+        qty = item.get("quantity") or 1
         if qty > 5:
             flags.append({
                 "type": "quantity_anomaly",
@@ -102,7 +102,7 @@ def _check_math_errors(bill_data: dict) -> list[dict]:
     items = bill_data.get("line_items", [])
     total_billed = bill_data.get("total_billed")
     if total_billed is not None and items:
-        calculated_total = sum(item.get("total_charge", 0) for item in items)
+        calculated_total = sum(item.get("total_charge") or 0 for item in items)
         diff = abs(calculated_total - total_billed)
         if diff > 1.0:
             flags.append({

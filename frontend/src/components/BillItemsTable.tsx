@@ -72,7 +72,7 @@ export default function BillItemsTable({
                       isFlagged ? "text-red-400" : "text-white"
                     }`}
                   >
-                    ${item.total_charge.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    ${(item.total_charge ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {isFlagged && itemDiscrepancy ? (

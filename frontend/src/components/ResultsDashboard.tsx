@@ -124,7 +124,7 @@ export default function ResultsDashboard({
                   <p className="text-slate-600 text-xs">Patient Owes</p>
                   <p className="text-white font-mono text-lg">
                     $
-                    {billData.patient_responsibility.toLocaleString("en-US", {
+                    {(billData.patient_responsibility ?? 0).toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                     })}
                   </p>
@@ -159,10 +159,10 @@ export default function ResultsDashboard({
                           {typeLabels[d.type] || d.type}
                         </span>
                       </div>
-                      {d.potential_overcharge > 0 && (
+                      {d.potential_overcharge && d.potential_overcharge > 0 && (
                         <span className={`${colors.text} font-mono text-sm font-medium`}>
                           +$
-                          {d.potential_overcharge.toLocaleString("en-US", {
+                          {(d.potential_overcharge ?? 0).toLocaleString("en-US", {
                             minimumFractionDigits: 2,
                           })}
                         </span>

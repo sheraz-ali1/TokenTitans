@@ -20,12 +20,18 @@ function App() {
   const [discrepancies, setDiscrepancies] = useState<Discrepancy[]>([]);
   const [assessment, setAssessment] = useState<ChatResponse["assessment"]>(null);
   const [totalSavings, setTotalSavings] = useState(0);
+  const [chatKey, setChatKey] = useState(0);
 
   const handleUploadComplete = useCallback((data: UploadResponse) => {
-    setSessionId(data.session_id);
-    setBillData(data.bill_data);
-    setDiscrepancies(data.discrepancies);
-    setScreen("review");
+    try {
+      setSessionId(data.session_id);
+      setBillData(data.bill_data);
+      setDiscrepancies(data.discrepancies || []);
+      setScreen("review");
+    } catch (error) {
+      console.error("Error handling upload complete:", error);
+      setScreen("upload");
+    }
   }, []);
 
   const handleChatComplete = useCallback(
@@ -61,7 +67,22 @@ function App() {
     return <BillUpload onUploadComplete={handleUploadComplete} />;
   }
 
-  if (screen === "review" && billData) {
+  if (screen === "review") {
+    if (!billData) {
+      return (
+        <div className="min-h-screen bg-[#0a0f1c] flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-400 mb-4">Error: No bill data available</p>
+            <button
+              onClick={handleRestart}
+              className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Start Over
+            </button>
+          </div>
+        </div>
+      );
+    }
     const savings = discrepancies.reduce(
       (sum, d) => sum + (d.potential_overcharge || 0),
       0
@@ -86,7 +107,7 @@ function App() {
               </h1>
               <p className="text-slate-500 text-sm mt-1">
                 {billData.provider_name || "Medical Provider"} &middot;{" "}
-                {billData.line_items.length} line items found
+                {billData.line_items?.length || 0} line items found
               </p>
             </div>
             <button
@@ -150,7 +171,7 @@ function App() {
                   }`}
                 >
                   <span>{d.description}</span>
-                  {d.potential_overcharge > 0 && (
+                  {d.potential_overcharge && d.potential_overcharge > 0 && (
                     <span className="font-mono font-medium ml-4 shrink-0">
                       +${d.potential_overcharge.toFixed(2)}
                     </span>
@@ -161,14 +182,19 @@ function App() {
           )}
 
           {/* Line items */}
-          <div className="mb-8">
-            <BillItemsTable items={billData.line_items} discrepancies={discrepancies} />
-          </div>
+          {billData.line_items && billData.line_items.length > 0 && (
+            <div className="mb-8">
+              <BillItemsTable items={billData.line_items} discrepancies={discrepancies} />
+            </div>
+          )}
 
           {/* Continue to chat */}
           <div className="flex justify-center">
             <button
-              onClick={() => setScreen("chat")}
+              onClick={() => {
+                setChatKey(prev => prev + 1);
+                setScreen("chat");
+              }}
               className="bg-teal-600 hover:bg-teal-500 text-white rounded-xl px-8 py-3.5 text-sm font-medium transition-all flex items-center gap-2"
             >
               Continue to Interview
@@ -195,6 +221,7 @@ function App() {
   if (screen === "chat" && billData) {
     return (
       <ChatInterface
+        key={`chat-${sessionId}-${chatKey}`}
         sessionId={sessionId}
         billData={billData}
         discrepancies={discrepancies}
@@ -216,7 +243,20 @@ function App() {
     );
   }
 
-  return null;
+  // Fallback: show error state
+  return (
+    <div className="min-h-screen bg-[#0a0f1c] flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-red-400 mb-4">Error: Invalid screen state</p>
+        <button
+          onClick={handleRestart}
+          className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          Start Over
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default App;
