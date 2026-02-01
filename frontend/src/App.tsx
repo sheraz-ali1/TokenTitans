@@ -10,8 +10,9 @@ import BillUpload from "@/components/BillUpload";
 import BillItemsTable from "@/components/BillItemsTable";
 import ChatInterface from "@/components/ChatInterface";
 import ResultsDashboard from "@/components/ResultsDashboard";
+import DisputePage from "@/components/DisputePage";
 
-type Screen = "upload" | "review" | "chat" | "results";
+type Screen = "upload" | "review" | "chat" | "results" | "dispute";
 
 function App() {
   const [screen, setScreen] = useState<Screen>("upload");
@@ -211,6 +212,21 @@ function App() {
         discrepancies={discrepancies}
         assessment={assessment}
         totalSavings={totalSavings}
+        onRestart={handleRestart}
+        onNavigateToDispute={() => setScreen("dispute")}
+      />
+    );
+  }
+
+  if (screen === "dispute" && billData) {
+    return (
+      <DisputePage
+        sessionId={sessionId}
+        billData={billData}
+        discrepancies={discrepancies}
+        totalSavings={totalSavings}
+        assessment={assessment}
+        onBack={() => setScreen("results")}
         onRestart={handleRestart}
       />
     );

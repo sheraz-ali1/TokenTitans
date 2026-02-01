@@ -59,6 +59,15 @@ export interface ResultsResponse {
   chat_history: { role: string; content: string }[];
 }
 
+export interface DisputePreviewResponse {
+  hospital_name: string;
+  hospital_address: string;
+  hospital_email: string;
+  draft_letter: string;
+  issues: { type: string; description: string; potential_overcharge: number }[];
+  total_savings: number;
+}
+
 export async function uploadBill(file: File): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
@@ -96,5 +105,25 @@ export async function sendMessage(sessionId: string, message: string): Promise<C
 export async function getResults(sessionId: string): Promise<ResultsResponse> {
   const res = await fetch(`${API_BASE}/results/${sessionId}`);
   if (!res.ok) throw new Error(`Results failed: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getDisputePreview(sessionId: string): Promise<DisputePreviewResponse> {
+  const res = await fetch(`${API_BASE}/dispute/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  if (!res.ok) throw new Error(`Dispute preview failed: ${res.statusText}`);
+  return res.json();
+}
+
+export async function sendDispute(sessionId: string, recipientEmail: string, letter: string): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/dispute/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, recipient_email: recipientEmail, letter }),
+  });
+  if (!res.ok) throw new Error(`Dispute send failed: ${res.statusText}`);
   return res.json();
 }

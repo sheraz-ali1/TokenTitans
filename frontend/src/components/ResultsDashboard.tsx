@@ -8,6 +8,7 @@ interface ResultsDashboardProps {
   assessment: ChatResponse["assessment"];
   totalSavings: number;
   onRestart: () => void;
+  onNavigateToDispute: () => void;
 }
 
 const severityColors = {
@@ -44,6 +45,7 @@ export default function ResultsDashboard({
   assessment,
   totalSavings,
   onRestart,
+  onNavigateToDispute,
 }: ResultsDashboardProps) {
   const highCount = discrepancies.filter((d) => d.severity === "high").length;
   const medCount = discrepancies.filter((d) => d.severity === "medium").length;
@@ -269,13 +271,13 @@ export default function ResultsDashboard({
             Want to dispute these charges?
           </p>
           <button
-            disabled
-            className="bg-slate-800 text-slate-500 rounded-xl px-6 py-3 text-sm font-medium cursor-not-allowed"
+            onClick={onNavigateToDispute}
+            className="bg-teal-600 hover:bg-teal-500 text-white rounded-xl px-8 py-3.5 text-sm font-medium transition-all shadow-lg shadow-teal-900/20"
           >
-            Auto-Dispute Coming Soon
+            Send Dispute Letter
           </button>
-          <p className="text-slate-600 text-xs mt-2">
-            AI-powered email drafting & phone calls to hospitals
+          <p className="text-slate-600 text-xs mt-3">
+            AI-powered email drafting & lookup
           </p>
         </div>
       </div>
