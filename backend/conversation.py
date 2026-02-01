@@ -1,12 +1,24 @@
 import os
 import json
-from google import genai
-from google.genai import types
-from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv is optional
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Lazy import to handle missing dependencies
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        try:
+            from google import genai
+            _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        except ImportError:
+            raise ImportError("google-genai package not installed. Please install it with: pip install google-genai")
+    return _client
 
 SYSTEM_PROMPT = """You are a friendly, professional medical billing assistant. Your job is to help patients understand their medical bills and identify potential errors.
 
@@ -48,6 +60,9 @@ AUTO-DETECTED DISCREPANCIES:
 
 def get_chat_response(session_data: dict, user_message: str) -> dict:
     """Process a chat message and return the agent's response."""
+    from google.genai import types
+    client = _get_client()
+    
     bill_data = session_data["bill_data"]
     discrepancies = session_data["discrepancies"]
     chat_history = session_data.get("chat_history", [])

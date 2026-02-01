@@ -1,12 +1,24 @@
 import os
 import json
-from google import genai
-from google.genai import types
-from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv is optional
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Lazy import to handle missing dependencies
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        try:
+            from google import genai
+            _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        except ImportError:
+            raise ImportError("google-genai package not installed. Please install it with: pip install google-genai")
+    return _client
 
 DISPUTE_GENERATOR_PROMPT = """
 Write a formal medical billing dispute letter based on the following information:
@@ -35,6 +47,8 @@ Return ONLY the letter text.
 
 def generate_dispute_letter(bill_data: dict, discrepancies: list, assessment: dict = None) -> str:
     """Generate a formal dispute letter using Gemini."""
+    from google.genai import types
+    client = _get_client()
     
     prompt = DISPUTE_GENERATOR_PROMPT.format(
         bill_data=json.dumps(bill_data, indent=2),

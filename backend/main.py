@@ -1,21 +1,52 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
-from extraction import extract_bill_data
-from discrepancy import detect_discrepancies
-from conversation import get_chat_response
-from hospital_lookup import lookup_hospital
-from dispute_generator import generate_dispute_letter
-from email_sender import send_dispute_email
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from extraction import extract_bill_data
-from discrepancy import detect_discrepancies
-from conversation import get_chat_response
-from database import get_fee_info
+from pydantic import BaseModel, EmailStr
 import os
 import random
 import glob
+
+from discrepancy import detect_discrepancies
+from database import get_fee_info
+
+# Core imports with error handling
+try:
+    from extraction import extract_bill_data
+except (ImportError, ModuleNotFoundError) as e:
+    print(f"Warning: extraction module not available: {e}")
+    def extract_bill_data(file_bytes: bytes, mime_type: str) -> dict:
+        raise HTTPException(503, "Bill extraction not available. Please install required dependencies (google-genai).")
+
+try:
+    from conversation import get_chat_response
+except (ImportError, ModuleNotFoundError) as e:
+    print(f"Warning: conversation module not available: {e}")
+    def get_chat_response(session_data: dict, user_message: str) -> dict:
+        raise HTTPException(503, "Chat functionality not available. Please install required dependencies (google-genai).")
+
+# Optional imports for dispute features
+try:
+    from hospital_lookup import lookup_hospital
+except ImportError:
+    def lookup_hospital(provider_name: str) -> dict:
+        return {
+            "hospital_name": provider_name or "Unknown Provider",
+            "address": "",
+            "billing_email": "",
+            "billing_phone": ""
+        }
+
+try:
+    from dispute_generator import generate_dispute_letter
+except ImportError:
+    def generate_dispute_letter(bill_data: dict, discrepancies: list, assessment: dict = None) -> str:
+        return "Error: Dispute letter generation not available. Please install required dependencies."
+
+try:
+    from email_sender import send_dispute_email
+except ImportError:
+    def send_dispute_email(recipient_email: str, letter: str, account_number: str = "Unknown"):
+        raise Exception("Email sending not available. Please install required dependencies.")
 
 app = FastAPI(title="MedBill Analyzer")
 
@@ -164,6 +195,9 @@ async def upload_bill(file: UploadFile = File(...)):
     try:
         bill_data = extract_bill_data(file_bytes, file.content_type)
     except Exception as e:
+        error_msg = str(e)
+        if "not available" in error_msg or "dependencies" in error_msg:
+            raise HTTPException(503, f"Service temporarily unavailable: {error_msg}")
         raise HTTPException(500, f"Failed to extract bill data: {str(e)}")
 
     # Enrich line items with reference prices
@@ -215,6 +249,9 @@ async def chat(msg: ChatMessage):
     try:
         result = get_chat_response(session, msg.message)
     except Exception as e:
+        error_msg = str(e)
+        if "not available" in error_msg or "dependencies" in error_msg:
+            raise HTTPException(503, f"Service temporarily unavailable: {error_msg}")
         raise HTTPException(500, f"Chat error: {str(e)}")
 
     if result["assessment"]:
@@ -241,6 +278,9 @@ async def start_chat(msg: dict):
     try:
         result = get_chat_response(session, "")
     except Exception as e:
+        error_msg = str(e)
+        if "not available" in error_msg or "dependencies" in error_msg:
+            raise HTTPException(503, f"Service temporarily unavailable: {error_msg}")
         import traceback
         error_details = traceback.format_exc()
         print(f"Chat start error for session {session_id}: {error_details}")

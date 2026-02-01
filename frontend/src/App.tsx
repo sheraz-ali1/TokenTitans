@@ -7,12 +7,10 @@ import type {
 } from "@/lib/api";
 import { getResults, confirmBill } from "@/lib/api";
 import BillUpload from "@/components/BillUpload";
-import EditableBillTable from "@/components/EditableBillTable";
+import BillItemsTable from "@/components/BillItemsTable";
 import ChatInterface from "@/components/ChatInterface";
 import ResultsDashboard from "@/components/ResultsDashboard";
 import DisputePage from "@/components/DisputePage";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Screen = "upload" | "review" | "chat" | "results" | "dispute";
 
@@ -26,15 +24,6 @@ function App() {
   const [totalSavings, setTotalSavings] = useState(0);
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
-
-  const handleUploadComplete = useCallback((data: UploadResponse) => {
-    setSessionId(data.session_id);
-    setBillData(data.bill_data);
-    setEditableBillData(data.bill_data);
-    // Discrepancies are empty until user confirms
-    setDiscrepancies([]);
-    setScreen("review");
-  }, []);
   const [chatKey, setChatKey] = useState(0);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -49,10 +38,12 @@ function App() {
     }, 150);
   }, []);
 
-  const handleUploadComplete = useCallback((data: UploadResponse) => {
+  const handleUploadComplete = useCallback((data: UploadResponse & { image_url?: string; discrepancies?: Discrepancy[] }) => {
     try {
       setSessionId(data.session_id);
       setBillData(data.bill_data);
+      setEditableBillData(data.bill_data);
+      // Discrepancies are empty until user confirms
       setDiscrepancies(data.discrepancies || []);
       // Keep existing imageUrl if already set, otherwise use from response
       if (!imageUrl && data.image_url) {
@@ -127,7 +118,6 @@ function App() {
     setAssessment(null);
     setTotalSavings(0);
     setConfirmError(null);
-  }, []);
     setImageUrl(null);
   }, [imageUrl]);
 
@@ -139,11 +129,6 @@ function App() {
     );
   }
 
-  if (screen === "review" && editableBillData) {
-    const calculatedTotal = editableBillData.line_items.reduce(
-      (sum, item) => sum + (item.total_charge || 0),
-      0
-    );
   if (screen === "review" || isTransitioning) {
     const savings = billData
       ? discrepancies.reduce((sum, d) => sum + (d.potential_overcharge || 0), 0)
@@ -164,11 +149,6 @@ function App() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight">
-                Review Your Bill
-              </h1>
-              <p className="text-slate-500 text-sm mt-1">
-                {editableBillData.provider_name || "Medical Provider"} &middot;{" "}
-                {editableBillData.line_items.length} line items found
                 {billData ? "Bill Extracted" : "Analyzing Bill"}
               </h1>
               <p className="text-slate-500 text-sm mt-1">
@@ -177,23 +157,14 @@ function App() {
                   : "Extracting line items with AI..."}
               </p>
             </div>
-            <Button
-              variant="ghost"
+            <button
               onClick={handleRestart}
-              className="text-slate-500 hover:text-slate-300"
+              className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
             >
               Start Over
-            </Button>
+            </button>
           </div>
 
-          {/* Info Card */}
-          <Card className="bg-blue-500/5 border-blue-500/20 mb-6">
-            <CardContent className="py-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
-                  <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
           {/* Quick stats - only show when billData is available */}
           {billData && (
             <div className="grid grid-cols-3 gap-3 mb-6">
@@ -255,63 +226,10 @@ function App() {
                     </span>
                   )}
                 </div>
-                <div>
-                  <p className="text-blue-300 text-sm font-medium">Review the extracted data</p>
-                  <p className="text-blue-300/70 text-xs mt-0.5">
-                    Please verify that the items below match your bill. You can edit any incorrect values before we analyze for discrepancies.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardContent className="py-5">
-                <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
-                  Total Billed
-                </p>
-                <p className="text-white text-2xl font-mono font-bold">
-                  ${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardContent className="py-5">
-                <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
-                  Line Items
-                </p>
-                <p className="text-white text-2xl font-mono font-bold">
-                  {editableBillData.line_items.length}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Editable Line Items Table */}
-          <div className="mb-8">
-            <EditableBillTable
-              items={editableBillData.line_items}
-              onUpdate={handleUpdateLineItems}
-            />
-          </div>
-
-          {/* Error message */}
-          {confirmError && (
-            <Card className="bg-red-500/10 border-red-500/20 mb-6">
-              <CardContent className="py-3">
-                <p className="text-red-400 text-sm">{confirmError}</p>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
           )}
 
-          {/* Confirm and Continue */}
-          <div className="flex justify-center">
-            <Button
-              onClick={handleConfirmBill}
-              disabled={isConfirming || editableBillData.line_items.length === 0}
-              className="bg-teal-600 hover:bg-teal-500 text-white rounded-xl px-8 py-6 text-sm font-medium"
           {/* Loading indicator when extracting */}
           {!billData && (
             <div className="mb-4 flex items-center justify-center py-8">
@@ -362,39 +280,32 @@ function App() {
           </div>
 
           {/* Continue to chat */}
-          <div className="flex justify-center mt-6">
-            <button
-              onClick={() => {
-                setChatKey(prev => prev + 1);
-                setScreen("chat");
-              }}
-              className="bg-teal-600 hover:bg-teal-500 text-white rounded-xl px-8 py-3.5 text-sm font-medium transition-all flex items-center gap-2"
-            >
-              {isConfirming ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  Confirm Bill & Analyze
-                  <svg
-                    className="w-4 h-4 ml-2"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 12h14M12 5l7 7-7 7"
-                    />
-                  </svg>
-                </>
-              )}
-            </Button>
-          </div>
+          {billData && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => {
+                  setChatKey(prev => prev + 1);
+                  setScreen("chat");
+                }}
+                className="bg-teal-600 hover:bg-teal-500 text-white rounded-xl px-8 py-3.5 text-sm font-medium transition-all flex items-center gap-2"
+              >
+                Continue to Interview
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 12h14M12 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );

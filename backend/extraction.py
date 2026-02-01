@@ -1,12 +1,24 @@
 import json
 import os
-from google import genai
-from google.genai import types
-from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv is optional
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Lazy import to handle missing dependencies
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        try:
+            from google import genai
+            _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        except ImportError:
+            raise ImportError("google-genai package not installed. Please install it with: pip install google-genai")
+    return _client
 
 EXTRACTION_PROMPT = """You are a medical bill data extraction expert. Analyze this medical bill image/document and extract ALL line items into structured JSON.
 
@@ -54,6 +66,8 @@ Return ONLY valid JSON in this exact format:
 
 def extract_bill_data(file_bytes: bytes, mime_type: str) -> dict:
     """Extract structured data from a medical bill image or PDF."""
+    from google.genai import types
+    client = _get_client()
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=[
