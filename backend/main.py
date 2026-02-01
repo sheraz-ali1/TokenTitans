@@ -1,10 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from extraction import extract_bill_data
 from discrepancy import detect_discrepancies
 from conversation import get_chat_response
 from database import get_fee_info
+import os
+import random
+import glob
 
 app = FastAPI(title="MedBill Analyzer")
 
@@ -34,6 +38,39 @@ class ChatMessage(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/test-image")
+def get_test_image():
+    """Get a random test image from bill_images directory."""
+    # Get the directory where this file is located
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    bill_images_dir = os.path.join(os.path.dirname(backend_dir), "bill_images")
+    
+    # Find all image files
+    image_extensions = ["*.png", "*.jpg", "*.jpeg", "*.webp"]
+    image_files = []
+    for ext in image_extensions:
+        image_files.extend(glob.glob(os.path.join(bill_images_dir, ext)))
+        image_files.extend(glob.glob(os.path.join(bill_images_dir, ext.upper())))
+    
+    if not image_files:
+        raise HTTPException(404, "No test images found in bill_images directory")
+    
+    # Select a random image
+    random_image = random.choice(image_files)
+    
+    # Determine content type
+    ext = os.path.splitext(random_image)[1].lower()
+    media_type_map = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp"
+    }
+    media_type = media_type_map.get(ext, "image/png")
+    
+    return FileResponse(random_image, media_type=media_type, filename=os.path.basename(random_image))
 
 
 def normalize_code(code: str) -> str:
