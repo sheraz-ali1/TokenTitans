@@ -4,9 +4,10 @@ import { uploadBill } from "@/lib/api";
 
 interface BillUploadProps {
   onUploadComplete: (data: UploadResponse) => void;
+  onImageReady?: (imageUrl: string) => void;
 }
 
-export default function BillUpload({ onUploadComplete }: BillUploadProps) {
+export default function BillUpload({ onUploadComplete, onImageReady }: BillUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,13 +18,18 @@ export default function BillUpload({ onUploadComplete }: BillUploadProps) {
     async (file: File) => {
       setError(null);
       setFileName(file.name);
+      
+      // Create a blob URL immediately for image files and notify parent
+      const isImage = file.type.startsWith('image/');
+      const imageUrl = isImage ? URL.createObjectURL(file) : undefined;
+      
+      if (imageUrl && onImageReady) {
+        onImageReady(imageUrl);
+      }
+      
       setIsUploading(true);
 
       try {
-        // Create a blob URL only for image files (not PDFs)
-        const isImage = file.type.startsWith('image/');
-        const imageUrl = isImage ? URL.createObjectURL(file) : undefined;
-        
         const data = await uploadBill(file);
         if (!data || !data.bill_data) {
           throw new Error("Invalid response from server");
@@ -36,9 +42,13 @@ export default function BillUpload({ onUploadComplete }: BillUploadProps) {
         setError(err instanceof Error ? err.message : "Upload failed");
         setIsUploading(false);
         setFileName(null);
+        // Clean up blob URL on error
+        if (imageUrl) {
+          URL.revokeObjectURL(imageUrl);
+        }
       }
     },
-    [onUploadComplete]
+    [onUploadComplete, onImageReady]
   );
 
   const handleDrop = useCallback(
