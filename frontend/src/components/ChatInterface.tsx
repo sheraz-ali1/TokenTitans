@@ -27,6 +27,7 @@ export default function ChatInterface({
   const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const initializedRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,8 +37,14 @@ export default function ChatInterface({
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Auto-start conversation
+  // Auto-start conversation - reset and reinitialize when component mounts or sessionId changes
   useEffect(() => {
+    // Reset state when component mounts or sessionId changes
+    setMessages([]);
+    setInput("");
+    setIsLoading(true);
+    initializedRef.current = false;
+
     let cancelled = false;
     async function init() {
       try {
@@ -47,7 +54,8 @@ export default function ChatInterface({
         if (res.assessment?.assessment_complete) {
           onComplete(res.assessment);
         }
-      } catch {
+      } catch (err) {
+        console.error("Chat initialization error:", err);
         if (!cancelled) {
           setMessages([
             {
@@ -60,13 +68,20 @@ export default function ChatInterface({
       } finally {
         if (!cancelled) {
           setIsLoading(false);
-          inputRef.current?.focus();
+          initializedRef.current = true;
+          setTimeout(() => {
+            inputRef.current?.focus();
+          }, 100);
         }
       }
     }
+    
     init();
-    return () => { cancelled = true; };
-  }, [sessionId, onComplete]);
+    return () => { 
+      cancelled = true;
+      initializedRef.current = false;
+    };
+  }, [sessionId]);
 
   const handleSend = async () => {
     const text = input.trim();
@@ -137,7 +152,7 @@ export default function ChatInterface({
             <div className="text-right">
               <p className="text-slate-500">Total Billed</p>
               <p className="text-white font-mono font-medium">
-                ${totalBilled.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                ${(totalBilled ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </p>
             </div>
             {flaggedCount > 0 && (

@@ -1,9 +1,4 @@
-import json
-from pathlib import Path
 
-REFERENCE_PRICES = json.loads(
-    (Path(__file__).parent / "reference_prices.json").read_text()
-)
 
 
 def detect_discrepancies(bill_data: dict) -> list[dict]:
@@ -43,32 +38,44 @@ def _check_duplicates(items: list[dict]) -> list[dict]:
 
 def _check_price_inflation(items: list[dict]) -> list[dict]:
     """Flag charges significantly above reference prices."""
+    from database import get_fee_info
+    
     flags = []
     for i, item in enumerate(items):
         code = item.get("code")
-        if code and code in REFERENCE_PRICES:
-            ref = REFERENCE_PRICES[code]
-            charge = item.get("total_charge") or 0
-            if charge > ref["high_price"] * 1.5:
-                flags.append({
-                    "type": "price_inflation",
-                    "severity": "high",
-                    "confidence": "medium",
-                    "description": f"'{item.get('description', 'Unknown')}' charged at ${charge:.2f}, well above typical range (${ref['avg_price']}-${ref['high_price']})",
-                    "items_involved": [i],
-                    "potential_overcharge": round(charge - ref["high_price"], 2),
-                    "reference": ref,
-                })
-            elif charge > ref["high_price"]:
-                flags.append({
-                    "type": "price_inflation",
-                    "severity": "medium",
-                    "confidence": "medium",
-                    "description": f"'{item.get('description', 'Unknown')}' charged at ${charge:.2f}, above typical high of ${ref['high_price']}",
-                    "items_involved": [i],
-                    "potential_overcharge": round(charge - ref["high_price"], 2),
-                    "reference": ref,
-                })
+        # Ensure code is a string and clean it up (assuming 5-digit CPT usually)
+        if code:
+             # Basic cleanup if code contains extra chars, though extraction should handle it.
+             code = str(code).strip()
+             
+             ref = get_fee_info(code)
+             
+             if ref:
+                charge = item.get("total_charge", 0)
+                # If charge is 0 or None, skip
+                if not charge:
+                    continue
+                    
+                if charge > ref["high_price"] * 1.5:
+                    flags.append({
+                        "type": "price_inflation",
+                        "severity": "high",
+                        "confidence": "medium",
+                        "description": f"'{item['description']}' charged at ${charge:.2f}, well above typical range (${ref['avg_price']}-${ref['high_price']})",
+                        "items_involved": [i],
+                        "potential_overcharge": round(charge - ref["high_price"], 2),
+                        "reference": ref,
+                    })
+                elif charge > ref["high_price"]:
+                    flags.append({
+                        "type": "price_inflation",
+                        "severity": "medium",
+                        "confidence": "medium",
+                        "description": f"'{item['description']}' charged at ${charge:.2f}, above typical high of ${ref['high_price']}",
+                        "items_involved": [i],
+                        "potential_overcharge": round(charge - ref["high_price"], 2),
+                        "reference": ref,
+                    })
     return flags
 
 

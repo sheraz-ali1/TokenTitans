@@ -20,19 +20,25 @@ export default function BillItemsTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-900/50">
-              <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs tracking-wider uppercase">
+              <th className="text-left px-3 py-2 text-slate-500 font-medium text-xs tracking-wider uppercase">
                 Service
               </th>
-              <th className="text-left px-4 py-3 text-slate-500 font-medium text-xs tracking-wider uppercase">
+              <th className="text-left px-3 py-2 text-slate-500 font-medium text-xs tracking-wider uppercase">
                 Code
               </th>
-              <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs tracking-wider uppercase">
+              <th className="text-right px-3 py-2 text-slate-500 font-medium text-xs tracking-wider uppercase">
                 Qty
               </th>
-              <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs tracking-wider uppercase">
+              <th className="text-right px-3 py-2 text-slate-500 font-medium text-xs tracking-wider uppercase">
+                Expected
+              </th>
+              <th className="text-right px-3 py-2 text-slate-500 font-medium text-xs tracking-wider uppercase">
                 Charge
               </th>
-              <th className="text-center px-4 py-3 text-slate-500 font-medium text-xs tracking-wider uppercase">
+              <th className="text-right px-3 py-2 text-slate-500 font-medium text-xs tracking-wider uppercase">
+                Overcharge
+              </th>
+              <th className="text-center px-3 py-2 text-slate-500 font-medium text-xs tracking-wider uppercase">
                 Status
               </th>
             </tr>
@@ -51,7 +57,7 @@ export default function BillItemsTable({
                     ${isFlagged ? "bg-red-500/5" : "hover:bg-slate-800/30"}
                   `}
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2">
                     <span className={isFlagged ? "text-red-300" : "text-slate-300"}>
                       {item.description}
                     </span>
@@ -61,20 +67,38 @@ export default function BillItemsTable({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                  <td className="px-3 py-2 font-mono text-xs text-slate-500">
                     {item.code || "—"}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-slate-400">
+                  <td className="px-3 py-2 text-right font-mono text-slate-400">
                     {item.quantity}
                   </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-400">
+                    {item.expected_charge != null ? (
+                      <span className="text-teal-400">
+                        ${item.expected_charge.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
+                  </td>
                   <td
-                    className={`px-4 py-3 text-right font-mono font-medium ${
+                    className={`px-3 py-2 text-right font-mono font-medium ${
                       isFlagged ? "text-red-400" : "text-white"
                     }`}
                   >
-                    ${item.total_charge.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    ${(item.total_charge ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-3 py-2 text-right font-mono">
+                    {item.expected_charge != null && item.total_charge > item.expected_charge ? (
+                      <span className="text-red-400 font-medium">
+                        +${(item.total_charge - item.expected_charge).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-center">
                     {isFlagged && itemDiscrepancy ? (
                       <Badge
                         variant="destructive"

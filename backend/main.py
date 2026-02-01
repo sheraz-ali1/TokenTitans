@@ -7,6 +7,15 @@ from conversation import get_chat_response
 from hospital_lookup import lookup_hospital
 from dispute_generator import generate_dispute_letter
 from email_sender import send_dispute_email
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from extraction import extract_bill_data
+from discrepancy import detect_discrepancies
+from conversation import get_chat_response
+from database import get_fee_info
+import os
+import random
+import glob
 
 app = FastAPI(title="MedBill Analyzer")
 
@@ -53,6 +62,96 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/test-image")
+def get_test_image():
+    """Get a random test image from bill_images directory."""
+    # Get the directory where this file is located
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    bill_images_dir = os.path.join(os.path.dirname(backend_dir), "bill_images")
+    
+    # Find all image files
+    image_extensions = ["*.png", "*.jpg", "*.jpeg", "*.webp"]
+    image_files = []
+    for ext in image_extensions:
+        image_files.extend(glob.glob(os.path.join(bill_images_dir, ext)))
+        image_files.extend(glob.glob(os.path.join(bill_images_dir, ext.upper())))
+    
+    if not image_files:
+        raise HTTPException(404, "No test images found in bill_images directory")
+    
+    # Select a random image
+    random_image = random.choice(image_files)
+    
+    # Determine content type
+    ext = os.path.splitext(random_image)[1].lower()
+    media_type_map = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp"
+    }
+    media_type = media_type_map.get(ext, "image/png")
+    
+    return FileResponse(random_image, media_type=media_type, filename=os.path.basename(random_image))
+
+
+def normalize_code(code: str) -> str:
+    """Normalize HCPCS/CPT code for database lookup."""
+    if not code:
+        return ""
+    # Remove spaces, dashes, dots, and convert to uppercase
+    normalized = str(code).strip().replace("-", "").replace(" ", "").replace(".", "").upper()
+    # Extract just the numeric/alphanumeric part (first 5 characters typically)
+    # HCPCS codes are usually 5 characters
+    if len(normalized) > 5:
+        # Might have modifiers, take first 5 chars
+        normalized = normalized[:5]
+    return normalized
+
+
+def enrich_line_items_with_reference_prices(bill_data: dict):
+    """
+    Add expected_charge (avg_price from data.db) to each line item.
+    Queries data.db fee_schedule table to get benchmark pricing for each HCPCS code.
+    """
+    line_items = bill_data.get("line_items", [])
+    found_count = 0
+    for item in line_items:
+        code = item.get("code")
+        if code:
+            # Normalize code for database lookup
+            normalized_code = normalize_code(code)
+            
+            if normalized_code:
+                # Query data.db for reference pricing
+                ref = get_fee_info(normalized_code)
+                if ref and ref.get("avg_price") and ref["avg_price"] > 0:
+                    # Add expected_charge based on avg_price from data.db, adjusted for quantity
+                    quantity = item.get("quantity", 1) or 1
+                    expected_total = round(ref["avg_price"] * quantity, 2)
+                    item["expected_charge"] = expected_total
+                    item["expected_charge_per_unit"] = round(ref["avg_price"], 2)
+                    item["high_price_per_unit"] = round(ref["high_price"], 2)
+                    found_count += 1
+                    print(f"✓ Found reference price for code {code} (normalized: {normalized_code}): ${ref['avg_price']:.2f} x {quantity} = ${expected_total:.2f}")
+                else:
+                    # No reference data found in data.db for this code
+                    item["expected_charge"] = None
+                    item["expected_charge_per_unit"] = None
+                    item["high_price_per_unit"] = None
+                    print(f"✗ No reference price found for code: {code} (normalized: {normalized_code})")
+            else:
+                item["expected_charge"] = None
+                item["expected_charge_per_unit"] = None
+                item["high_price_per_unit"] = None
+        else:
+            item["expected_charge"] = None
+            item["expected_charge_per_unit"] = None
+            item["high_price_per_unit"] = None
+    
+    print(f"Enriched {found_count}/{len(line_items)} line items with reference prices from data.db")
+
+
 @app.post("/upload-bill")
 async def upload_bill(file: UploadFile = File(...)):
     global session_counter
@@ -67,7 +166,11 @@ async def upload_bill(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(500, f"Failed to extract bill data: {str(e)}")
 
-    # Do NOT run discrepancy detection yet - wait for user to confirm/edit
+    # Enrich line items with reference prices
+    enrich_line_items_with_reference_prices(bill_data)
+
+    discrepancies = detect_discrepancies(bill_data)
+
     session_counter += 1
     session_id = f"session-{session_counter}"
     bill_store[session_id] = {
@@ -123,14 +226,24 @@ async def chat(msg: ChatMessage):
 @app.post("/chat/start")
 async def start_chat(msg: dict):
     session_id = msg.get("session_id")
+    if not session_id:
+        raise HTTPException(400, "session_id is required")
+    
     if session_id not in bill_store:
-        raise HTTPException(404, "Session not found")
+        raise HTTPException(404, f"Session not found: {session_id}")
 
     session = bill_store[session_id]
+    
+    # Ensure chat_history exists
+    if "chat_history" not in session:
+        session["chat_history"] = []
 
     try:
         result = get_chat_response(session, "")
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Chat start error for session {session_id}: {error_details}")
         raise HTTPException(500, f"Chat start error: {str(e)}")
 
     return result

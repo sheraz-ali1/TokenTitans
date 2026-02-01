@@ -8,6 +8,9 @@ export interface LineItem {
   total_charge: number;
   date_of_service: string | null;
   category: string;
+  expected_charge?: number | null;
+  expected_charge_per_unit?: number | null;
+  high_price_per_unit?: number | null;
 }
 
 export interface BillData {
@@ -44,6 +47,7 @@ export interface UploadResponse {
 export interface ConfirmBillResponse {
   discrepancies: Discrepancy[];
   total_savings: number;
+  image_url?: string; // Optional blob URL for the uploaded image
 }
 
 export interface ChatResponse {
@@ -84,7 +88,20 @@ export async function uploadBill(file: File): Promise<UploadResponse> {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || res.statusText);
   }
-  return res.json();
+  const data = await res.json();
+  // Validate response structure
+  if (!data.session_id || !data.bill_data) {
+    throw new Error("Invalid response format from server");
+  }
+  // Ensure line_items is an array
+  if (!Array.isArray(data.bill_data.line_items)) {
+    data.bill_data.line_items = [];
+  }
+  // Ensure discrepancies is an array
+  if (!Array.isArray(data.discrepancies)) {
+    data.discrepancies = [];
+  }
+  return data;
 }
 
 export async function confirmBill(sessionId: string, billData: BillData): Promise<ConfirmBillResponse> {
