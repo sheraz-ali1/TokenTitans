@@ -83,14 +83,24 @@ async def chat(msg: ChatMessage):
 @app.post("/chat/start")
 async def start_chat(msg: dict):
     session_id = msg.get("session_id")
+    if not session_id:
+        raise HTTPException(400, "session_id is required")
+    
     if session_id not in bill_store:
-        raise HTTPException(404, "Session not found")
+        raise HTTPException(404, f"Session not found: {session_id}")
 
     session = bill_store[session_id]
+    
+    # Ensure chat_history exists
+    if "chat_history" not in session:
+        session["chat_history"] = []
 
     try:
         result = get_chat_response(session, "")
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Chat start error for session {session_id}: {error_details}")
         raise HTTPException(500, f"Chat start error: {str(e)}")
 
     return result

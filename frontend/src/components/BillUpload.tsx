@@ -21,10 +21,15 @@ export default function BillUpload({ onUploadComplete }: BillUploadProps) {
 
       try {
         const data = await uploadBill(file);
+        if (!data || !data.bill_data) {
+          throw new Error("Invalid response from server");
+        }
         onUploadComplete(data);
       } catch (err) {
+        console.error("Upload error:", err);
         setError(err instanceof Error ? err.message : "Upload failed");
         setIsUploading(false);
+        setFileName(null);
       }
     },
     [onUploadComplete]
