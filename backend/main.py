@@ -33,6 +33,11 @@ class ChatMessage(BaseModel):
     message: str
 
 
+class ConfirmBillRequest(BaseModel):
+    session_id: str
+    bill_data: dict  # The edited bill data from frontend
+
+
 class DisputePreviewRequest(BaseModel):
     session_id: str
 
@@ -62,17 +67,39 @@ async def upload_bill(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(500, f"Failed to extract bill data: {str(e)}")
 
-    discrepancies = detect_discrepancies(bill_data)
-
+    # Do NOT run discrepancy detection yet - wait for user to confirm/edit
     session_counter += 1
     session_id = f"session-{session_counter}"
     bill_store[session_id] = {
         "bill_data": bill_data,
-        "discrepancies": discrepancies,
+        "discrepancies": [],  # Empty until user confirms
         "chat_history": [],
     }
 
-    return {"session_id": session_id, "bill_data": bill_data, "discrepancies": discrepancies}
+    return {"session_id": session_id, "bill_data": bill_data}
+
+
+@app.post("/confirm-bill")
+async def confirm_bill(req: ConfirmBillRequest):
+    """Run discrepancy detection after user confirms/edits the bill."""
+    if req.session_id not in bill_store:
+        raise HTTPException(404, "Session not found")
+
+    session = bill_store[req.session_id]
+    
+    # Save the (potentially edited) bill data
+    session["bill_data"] = req.bill_data
+    
+    # Now run discrepancy detection on the confirmed data
+    discrepancies = detect_discrepancies(req.bill_data)
+    session["discrepancies"] = discrepancies
+    
+    total_savings = sum((d.get("potential_overcharge") or 0) for d in discrepancies)
+    
+    return {
+        "discrepancies": discrepancies,
+        "total_savings": total_savings
+    }
 
 
 @app.post("/chat")

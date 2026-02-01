@@ -38,7 +38,12 @@ export interface Discrepancy {
 export interface UploadResponse {
   session_id: string;
   bill_data: BillData;
+  // Note: discrepancies are empty until user confirms bill
+}
+
+export interface ConfirmBillResponse {
   discrepancies: Discrepancy[];
+  total_savings: number;
 }
 
 export interface ChatResponse {
@@ -74,6 +79,19 @@ export async function uploadBill(file: File): Promise<UploadResponse> {
   const res = await fetch(`${API_BASE}/upload-bill`, {
     method: "POST",
     body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || res.statusText);
+  }
+  return res.json();
+}
+
+export async function confirmBill(sessionId: string, billData: BillData): Promise<ConfirmBillResponse> {
+  const res = await fetch(`${API_BASE}/confirm-bill`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, bill_data: billData }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));

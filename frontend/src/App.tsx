@@ -5,12 +5,14 @@ import type {
   UploadResponse,
   ChatResponse,
 } from "@/lib/api";
-import { getResults } from "@/lib/api";
+import { getResults, confirmBill } from "@/lib/api";
 import BillUpload from "@/components/BillUpload";
-import BillItemsTable from "@/components/BillItemsTable";
+import EditableBillTable from "@/components/EditableBillTable";
 import ChatInterface from "@/components/ChatInterface";
 import ResultsDashboard from "@/components/ResultsDashboard";
 import DisputePage from "@/components/DisputePage";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Screen = "upload" | "review" | "chat" | "results" | "dispute";
 
@@ -18,16 +20,50 @@ function App() {
   const [screen, setScreen] = useState<Screen>("upload");
   const [sessionId, setSessionId] = useState<string>("");
   const [billData, setBillData] = useState<BillData | null>(null);
+  const [editableBillData, setEditableBillData] = useState<BillData | null>(null);
   const [discrepancies, setDiscrepancies] = useState<Discrepancy[]>([]);
   const [assessment, setAssessment] = useState<ChatResponse["assessment"]>(null);
   const [totalSavings, setTotalSavings] = useState(0);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const handleUploadComplete = useCallback((data: UploadResponse) => {
     setSessionId(data.session_id);
     setBillData(data.bill_data);
-    setDiscrepancies(data.discrepancies);
+    setEditableBillData(data.bill_data);
+    // Discrepancies are empty until user confirms
+    setDiscrepancies([]);
     setScreen("review");
   }, []);
+
+  const handleConfirmBill = useCallback(async () => {
+    if (!editableBillData) return;
+    
+    setIsConfirming(true);
+    setConfirmError(null);
+    
+    try {
+      const result = await confirmBill(sessionId, editableBillData);
+      setBillData(editableBillData);
+      setDiscrepancies(result.discrepancies);
+      setTotalSavings(result.total_savings);
+      setScreen("chat");
+    } catch (err) {
+      setConfirmError("Failed to analyze bill. Please try again.");
+    } finally {
+      setIsConfirming(false);
+    }
+  }, [sessionId, editableBillData]);
+
+  const handleUpdateLineItems = useCallback((items: BillData["line_items"]) => {
+    if (!editableBillData) return;
+    const newTotal = items.reduce((sum, item) => sum + (item.total_charge || 0), 0);
+    setEditableBillData({
+      ...editableBillData,
+      line_items: items,
+      total_billed: newTotal,
+    });
+  }, [editableBillData]);
 
   const handleChatComplete = useCallback(
     async (chatAssessment: ChatResponse["assessment"]) => {
@@ -53,18 +89,20 @@ function App() {
     setScreen("upload");
     setSessionId("");
     setBillData(null);
+    setEditableBillData(null);
     setDiscrepancies([]);
     setAssessment(null);
     setTotalSavings(0);
+    setConfirmError(null);
   }, []);
 
   if (screen === "upload") {
     return <BillUpload onUploadComplete={handleUploadComplete} />;
   }
 
-  if (screen === "review" && billData) {
-    const savings = discrepancies.reduce(
-      (sum, d) => sum + (d.potential_overcharge || 0),
+  if (screen === "review" && editableBillData) {
+    const calculatedTotal = editableBillData.line_items.reduce(
+      (sum, item) => sum + (item.total_charge || 0),
       0
     );
 
@@ -83,110 +121,113 @@ function App() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight">
-                Bill Extracted
+                Review Your Bill
               </h1>
               <p className="text-slate-500 text-sm mt-1">
-                {billData.provider_name || "Medical Provider"} &middot;{" "}
-                {billData.line_items.length} line items found
+                {editableBillData.provider_name || "Medical Provider"} &middot;{" "}
+                {editableBillData.line_items.length} line items found
               </p>
             </div>
-            <button
+            <Button
+              variant="ghost"
               onClick={handleRestart}
-              className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+              className="text-slate-500 hover:text-slate-300"
             >
               Start Over
-            </button>
+            </Button>
           </div>
 
-          {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-              <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
-                Total Billed
-              </p>
-              <p className="text-white text-2xl font-mono font-bold">
-                $
-                {(billData.total_billed ?? 0).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                })}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-              <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
-                Issues Found
-              </p>
-              <p
-                className={`text-2xl font-mono font-bold ${
-                  discrepancies.length > 0 ? "text-red-400" : "text-teal-400"
-                }`}
-              >
-                {discrepancies.length}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-              <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
-                Potential Savings
-              </p>
-              <p className="text-teal-400 text-2xl font-mono font-bold">
-                $
-                {savings.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                })}
-              </p>
-            </div>
-          </div>
-
-          {/* Discrepancy alerts */}
-          {discrepancies.length > 0 && (
-            <div className="mb-6 space-y-2">
-              {discrepancies.map((d, i) => (
-                <div
-                  key={i}
-                  className={`rounded-lg px-4 py-3 text-sm flex items-center justify-between ${
-                    d.severity === "high"
-                      ? "bg-red-500/10 border border-red-500/20 text-red-300"
-                      : d.severity === "medium"
-                      ? "bg-amber-500/10 border border-amber-500/20 text-amber-300"
-                      : "bg-blue-500/10 border border-blue-500/20 text-blue-300"
-                  }`}
-                >
-                  <span>{d.description}</span>
-                  {d.potential_overcharge > 0 && (
-                    <span className="font-mono font-medium ml-4 shrink-0">
-                      +${d.potential_overcharge.toFixed(2)}
-                    </span>
-                  )}
+          {/* Info Card */}
+          <Card className="bg-blue-500/5 border-blue-500/20 mb-6">
+            <CardContent className="py-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-              ))}
-            </div>
+                <div>
+                  <p className="text-blue-300 text-sm font-medium">Review the extracted data</p>
+                  <p className="text-blue-300/70 text-xs mt-0.5">
+                    Please verify that the items below match your bill. You can edit any incorrect values before we analyze for discrepancies.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardContent className="py-5">
+                <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
+                  Total Billed
+                </p>
+                <p className="text-white text-2xl font-mono font-bold">
+                  ${calculatedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardContent className="py-5">
+                <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
+                  Line Items
+                </p>
+                <p className="text-white text-2xl font-mono font-bold">
+                  {editableBillData.line_items.length}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Editable Line Items Table */}
+          <div className="mb-8">
+            <EditableBillTable
+              items={editableBillData.line_items}
+              onUpdate={handleUpdateLineItems}
+            />
+          </div>
+
+          {/* Error message */}
+          {confirmError && (
+            <Card className="bg-red-500/10 border-red-500/20 mb-6">
+              <CardContent className="py-3">
+                <p className="text-red-400 text-sm">{confirmError}</p>
+              </CardContent>
+            </Card>
           )}
 
-          {/* Line items */}
-          <div className="mb-8">
-            <BillItemsTable items={billData.line_items} discrepancies={discrepancies} />
-          </div>
-
-          {/* Continue to chat */}
+          {/* Confirm and Continue */}
           <div className="flex justify-center">
-            <button
-              onClick={() => setScreen("chat")}
-              className="bg-teal-600 hover:bg-teal-500 text-white rounded-xl px-8 py-3.5 text-sm font-medium transition-all flex items-center gap-2"
+            <Button
+              onClick={handleConfirmBill}
+              disabled={isConfirming || editableBillData.line_items.length === 0}
+              className="bg-teal-600 hover:bg-teal-500 text-white rounded-xl px-8 py-6 text-sm font-medium"
             >
-              Continue to Interview
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 12h14M12 5l7 7-7 7"
-                />
-              </svg>
-            </button>
+              {isConfirming ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  Confirm Bill & Analyze
+                  <svg
+                    className="w-4 h-4 ml-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 12h14M12 5l7 7-7 7"
+                    />
+                  </svg>
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </div>
